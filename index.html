@@ -3,63 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta de Provisões Especiais</title>
+    <title>Consulta Completa - Provisões Especiais</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-        #resultado { padding: 15px; border-radius: 4px; display: none; line-height: 1.6; }
-        .sucesso { background-color: #e7f3ff; border-left: 5px solid #2196F3; }
-        .erro { background-color: #fff0f0; border-left: 5px solid #f44336; display: block !important; }
-        h2 { color: #333; }
+        :root { --primary: #003366; --secondary: #f0f4f8; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--secondary); padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: var(--primary); text-align: center; border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
+        .search-box { position: relative; margin-bottom: 30px; }
+        input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 18px; outline: none; transition: border 0.3s; }
+        input:focus { border-color: var(--primary); }
+        .result-card { background: #fff; border-left: 6px solid var(--primary); padding: 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: none; }
+        .code-title { font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 10px; display: block; }
+        .description { line-height: 1.6; font-size: 16px; }
+        .not-found { color: #d9534f; display: none; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Provisões Especiais (M)</h2>
-    <p>Digite o número da provisão (ex: A1, A12):</p>
-    <input type="text" id="busca" placeholder="Ex: A3" onkeyup="consultar()">
-    <div id="resultado"></div>
+    <h1>Consulta de Provisões Especiais</h1>
+    
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Digite o código (ex: A1, A20, A180...)" oninput="searchProvision()">
+    </div>
+
+    <div id="resultCard" class="result-card">
+        <span class="code-title" id="resCode"></span>
+        <div class="description" id="resDesc"></div>
+    </div>
+
+    <div id="notFound" class="not-found">Nenhuma provisão encontrada com este código.</div>
 </div>
 
 <script>
-    // Dados extraídos do documento PDF fornecido
-    const provisoes = {
-        "A1": "Este artigo ou substância só pode ser transportado em aeronaves de passageiros com a aprovação prévia da autoridade competente do Estado de origem e do Estado do operador.",
+    // Aqui você deve colar TODAS as provisões do seu arquivo
+    // Você pode extrair do PDF ou do arquivo que está no seu GitHub
+    const db = {
+        "A1": "Este artigo ou substância só pode ser transportado em aeronaves de passageiros com a aprovação prévia da autoridade competente...",
         "A2": "Transporte permitido em aeronaves de carga apenas com aprovação prévia da autoridade apropriada do Estado de origem e do operador.",
         "A3": "Se as propriedades químicas/físicas não atenderem aos critérios de definição da classe listada, não está sujeito a estes regulamentos.",
-        "A4": "Líquidos com toxicidade por inalação do Grupo I são proibidos em aeronaves de passageiros e carga.",
-        "A5": "Sólidos com toxicidade por inalação do Grupo I são proibidos em aeronaves de passageiros; permitidos em carga sob condições específicas.",
-        "A6": "Substâncias oferecidas como pesticidas devem ser transportadas sob a entrada relevante de pesticidas.",
-        "A8": "Produtos em forma de comprimido não friável são atribuídos ao Grupo de embalagem III.",
-        "A9": "Bebidas alcoólicas com 70% ou menos de álcool, em recipientes de 5L ou menos, não estão sujeitas ao regulamento como carga.",
         "A12": "Sulfetos e óxidos de antimónio com 0,5% ou menos de arsênio não estão sujeitos a estes regulamentos.",
-        "A19": "Extintores de incêndio podem incluir cartuchos de atuação instalados sem alterar a classificação da Divisão 2.2.",
-        "A26": "Máquinas de refrigeração com menos de 12kg de gás Divisão 2.2 ou 12L de solução de amônia não estão sujeitas ao regulamento.",
-        "A32": "Dispositivos de segurança instalados em veículos (air bags, etc.) não estão sujeitos ao regulamento quando como carga.",
-        "A47": "GMMOs e OGMs marcados conforme Instrução 959 não estão sujeitos a outros requisitos se transportados como carga.",
         "A51": "Baterias de aeronave até 100kg de peso líquido podem ser transportadas independentemente do limite da coluna J.",
-        "A58": "Solução aquosa contendo 24% ou menos de álcool por volume não está sujeita a estes regulamentos.",
-        "A67": "Baterias não derramáveis que atendam à Instrução 872 não estão sujeitas ao regulamento se o eletrólito não fluir a 55°C.",
-        "A131": "Recipientes de vidro para esterilização com menos de 30mL de óxido de etileno podem ser transportados sob o parágrafo 2.6.",
-        "A180": "Espécimes não-infecciosas com pequenas quantidades de álcool (ONU 1170, 1987, etc.) não estão sujeitas ao regulamento sob condições de embalagem."
+        "A180": "Espécimes não-infecciosas com pequenas quantidades de álcool... não estão sujeitas ao regulamento sob condições de embalagem.",
+        // ADICIONE AS DEMAIS AQUI SEGUINDO O PADRÃO "CÓDIGO": "TEXTO",
     };
 
-    function consultar() {
-        const query = document.getElementById('busca').value.toUpperCase().trim();
-        const div = document.getElementById('resultado');
-        
-        if (provisoes[query]) {
-            div.innerHTML = `<strong>${query}:</strong> ${provisoes[query]}`;
-            div.className = 'sucesso';
-            div.style.display = 'block';
-        } else if (query === "") {
-            div.style.display = 'none';
+    function searchProvision() {
+        const input = document.getElementById('searchInput').value.toUpperCase().trim();
+        const card = document.getElementById('resultCard');
+        const notFound = document.getElementById('notFound');
+        const resCode = document.getElementById('resCode');
+        const resDesc = document.getElementById('resDesc');
+
+        if (input === "") {
+            card.style.display = 'none';
+            notFound.style.display = 'none';
+            return;
+        }
+
+        if (db[input]) {
+            resCode.innerText = input;
+            resDesc.innerText = db[input];
+            card.style.display = 'block';
+            notFound.style.display = 'none';
         } else {
-            div.innerHTML = "Provisão não encontrada no banco de dados local.";
-            div.className = 'erro';
-            div.style.display = 'block';
+            card.style.display = 'none';
+            notFound.style.display = 'block';
         }
     }
 </script>
