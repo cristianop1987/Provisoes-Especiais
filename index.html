@@ -1,77 +1,110 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta Completa - Provisões Especiais</title>
-    <style>
-        :root { --primary: #003366; --secondary: #f0f4f8; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--secondary); padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        h1 { color: var(--primary); text-align: center; border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
-        .search-box { position: relative; margin-bottom: 30px; }
-        input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 18px; outline: none; transition: border 0.3s; }
-        input:focus { border-color: var(--primary); }
-        .result-card { background: #fff; border-left: 6px solid var(--primary); padding: 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: none; }
-        .code-title { font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 10px; display: block; }
-        .description { line-height: 1.6; font-size: 16px; }
-        .not-found { color: #d9534f; display: none; text-align: center; font-weight: bold; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consulta de Provisões Especiais</title>
+  <style>
+    :root { --primary: #003366; --secondary: #f0f4f8; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--secondary); padding: 20px; color: #333; }
+    .container { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+    h1 { color: var(--primary); text-align: center; border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
+    .search-box { margin: 24px 0 12px; }
+    input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 18px; outline: none; }
+    input:focus { border-color: var(--primary); }
+    .status { color: #555; font-size: 14px; margin: 10px 2px 20px; }
+    .result-card { background: #fff; border-left: 6px solid var(--primary); padding: 20px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,.05); display: none; }
+    .code-title { font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 10px; display: block; }
+    .description { line-height: 1.65; font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .not-found, .error { display: none; text-align: center; font-weight: bold; padding: 14px; border-radius: 8px; }
+    .not-found { color: #a94442; background: #fdf1f0; }
+    .error { color: #8a4b08; background: #fff4df; }
+    @media (max-width: 600px) { body { padding: 10px; } .container { padding: 20px 16px; } }
+  </style>
 </head>
 <body>
-
-<div class="container">
+  <main class="container">
     <h1>Consulta de Provisões Especiais</h1>
-    
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Digite o código (ex: A1, A20, A180...)" oninput="searchProvision()">
+      <input type="text" id="searchInput" placeholder="Digite o código (ex.: A1, A20, A180...)" autocomplete="off" disabled>
     </div>
-
+    <div id="status" class="status">Carregando planilha...</div>
     <div id="resultCard" class="result-card">
-        <span class="code-title" id="resCode"></span>
-        <div class="description" id="resDesc"></div>
+      <span class="code-title" id="resCode"></span>
+      <div class="description" id="resDesc"></div>
     </div>
-
     <div id="notFound" class="not-found">Nenhuma provisão encontrada com este código.</div>
-</div>
+    <div id="error" class="error"></div>
+  </main>
 
-<script>
-    // Aqui você deve colar TODAS as provisões do seu arquivo
-    // Você pode extrair do PDF ou do arquivo que está no seu GitHub
-    const db = {
-        "A1": "Este artigo ou substância só pode ser transportado em aeronaves de passageiros com a aprovação prévia da autoridade competente...",
-        "A2": "Transporte permitido em aeronaves de carga apenas com aprovação prévia da autoridade apropriada do Estado de origem e do operador.",
-        "A3": "Se as propriedades químicas/físicas não atenderem aos critérios de definição da classe listada, não está sujeito a estes regulamentos.",
-        "A12": "Sulfetos e óxidos de antimónio com 0,5% ou menos de arsênio não estão sujeitos a estes regulamentos.",
-        "A51": "Baterias de aeronave até 100kg de peso líquido podem ser transportadas independentemente do limite da coluna J.",
-        "A180": "Espécimes não-infecciosas com pequenas quantidades de álcool... não estão sujeitas ao regulamento sob condições de embalagem.",
-        // ADICIONE AS DEMAIS AQUI SEGUINDO O PADRÃO "CÓDIGO": "TEXTO",
-    };
+  <!-- Biblioteca para ler arquivos Excel no navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    let db = {};
+
+    async function loadSpreadsheet() {
+      const status = document.getElementById('status');
+      const input = document.getElementById('searchInput');
+      const error = document.getElementById('error');
+
+      try {
+        // O arquivo Excel precisa estar na mesma pasta deste HTML no GitHub.
+        const response = await fetch('./Provisoes_Especiais_Organizadas.xlsx');
+        if (!response.ok) {
+          throw new Error('Não foi possível localizar a planilha. Confira se Provisoes_Especiais_Organizadas.xlsx está na mesma pasta do index.html.');
+        }
+
+        const buffer = await response.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheet = workbook.Sheets['Disposições Especiais'];
+        if (!sheet) throw new Error('A aba "Disposições Especiais" não foi encontrada na planilha.');
+
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        for (const row of rows) {
+          const code = String(row['Código'] || '').trim().toUpperCase();
+          const description = String(row['Texto da disposição especial'] || '').trim();
+          if (code && description) db[code] = description;
+        }
+
+        if (Object.keys(db).length === 0) throw new Error('A planilha foi aberta, mas nenhum registro foi encontrado. Confira os nomes das colunas.');
+
+        status.textContent = `${Object.keys(db).length} provisões carregadas da planilha.`;
+        input.disabled = false;
+        input.focus();
+      } catch (err) {
+        status.textContent = 'Não foi possível carregar a base de dados.';
+        error.textContent = err.message;
+        error.style.display = 'block';
+      }
+    }
 
     function searchProvision() {
-        const input = document.getElementById('searchInput').value.toUpperCase().trim();
-        const card = document.getElementById('resultCard');
-        const notFound = document.getElementById('notFound');
-        const resCode = document.getElementById('resCode');
-        const resDesc = document.getElementById('resDesc');
+      const value = document.getElementById('searchInput').value.toUpperCase().trim();
+      const card = document.getElementById('resultCard');
+      const notFound = document.getElementById('notFound');
+      const resCode = document.getElementById('resCode');
+      const resDesc = document.getElementById('resDesc');
 
-        if (input === "") {
-            card.style.display = 'none';
-            notFound.style.display = 'none';
-            return;
-        }
+      if (!value) {
+        card.style.display = 'none';
+        notFound.style.display = 'none';
+        return;
+      }
 
-        if (db[input]) {
-            resCode.innerText = input;
-            resDesc.innerText = db[input];
-            card.style.display = 'block';
-            notFound.style.display = 'none';
-        } else {
-            card.style.display = 'none';
-            notFound.style.display = 'block';
-        }
+      if (db[value]) {
+        resCode.textContent = value;
+        resDesc.textContent = db[value];
+        card.style.display = 'block';
+        notFound.style.display = 'none';
+      } else {
+        card.style.display = 'none';
+        notFound.style.display = 'block';
+      }
     }
-</script>
 
+    document.getElementById('searchInput').addEventListener('input', searchProvision);
+    loadSpreadsheet();
+  </script>
 </body>
 </html>
